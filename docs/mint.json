@@ -75,6 +75,12 @@
       ]
     },
     {
+      "group": "Integrations",
+      "pages": [
+        "integrations/pre-built"
+      ]
+    },
+    {
       "group": "Tutorials",
       "pages": [
         "tutorials/workflows-tutorial",
