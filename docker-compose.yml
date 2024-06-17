@@ -55,7 +55,8 @@ services:
     restart: unless-stopped
     networks:
       - internal-network
-    entrypoint: [ "python", "tracecat/dsl/worker.py" ]
+    entrypoint: [ "sh", "-c", "sleep 10 && python tracecat/dsl/worker.py" ]
+
 
   frontend:
     build:
@@ -103,9 +104,24 @@ services:
     networks:
       - internal-network
 
+  temporal:
+    build:
+      context: .
+      dockerfile: Dockerfile.temporal
+    container_name: temporal
+    network_mode: host
+    ports:
+      - "7233:7233"
+      - "8233:8233"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7233/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
 networks:
   internal-network:
-
 
 volumes:
   app-storage:

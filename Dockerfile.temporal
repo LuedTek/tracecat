@@ -1,0 +1,20 @@
+# Use an official Golang runtime as a parent image
+FROM golang:1.20-alpine
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Install necessary packages
+RUN apk add --no-cache git curl
+
+# Download and install the Temporal CLI
+RUN curl -sSf https://temporal.download/cli.sh | sh
+
+# Make sure the temporal binary is in the PATH
+ENV PATH="/root/.temporalio/bin:${PATH}"
+
+# Expose the default Temporal server ports
+EXPOSE 7233 8233
+
+# Set the entry point to start the Temporal server
+CMD ["temporal", "server", "start-dev"]
