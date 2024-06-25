@@ -33,7 +33,7 @@ services:
 
   temporal_ui:
     ports:
-      - 4202:8080
+      - 4203:8080
     environment:
       - TEMPORAL_CORS_ORIGINS=https://temporal.${ROOT_DOMAIN}
     networks:
