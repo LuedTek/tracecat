@@ -47,7 +47,7 @@ services:
       - "traefik.http.routers.temporal.middlewares=no-auth@docker"
       - "traefik.http.routers.temporal.service=temporal"
       - "traefik.http.services.temporal.loadbalancer.server.scheme=http"
-      - "traefik.http.services.temporal.loadbalancer.server.port=4202"
+      - "traefik.http.services.temporal.loadbalancer.server.port=4203"
 
 networks:
   wan:
