@@ -1,0 +1,53 @@
+services:
+  api:
+    ports:
+      - 4202:8000
+    networks:
+      - wan
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tracecat-api.tls=true"
+      - "traefik.http.routers.tracecat-api.entrypoints=websecure"
+      - "traefik.http.routers.tracecat-api.tls.certresolver=dns-cloudflare"
+      - "traefik.http.routers.tracecat-api.rule=Host(`tc.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.tracecat-api.middlewares=no-auth@docker"
+      - "traefik.http.routers.tracecat-api.service=tracecat-api"
+      - "traefik.http.services.tracecat-api.loadbalancer.server.scheme=http"
+      - "traefik.http.services.tracecat-api.loadbalancer.server.port=4202"
+
+  frontend:
+    ports:
+      - 4201:3000
+    networks:
+      - wan
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tracecat.tls=true"
+      - "traefik.http.routers.tracecat.entrypoints=websecure"
+      - "traefik.http.routers.tracecat.tls.certresolver=dns-cloudflare"
+      - "traefik.http.routers.tracecat.rule=Host(`tracecat.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.tracecat.middlewares=no-auth@docker"
+      - "traefik.http.routers.tracecat.service=tracecat"
+      - "traefik.http.services.tracecat.loadbalancer.server.scheme=http"
+      - "traefik.http.services.tracecat.loadbalancer.server.port=4201"
+
+  temporal_ui:
+    ports:
+      - 4202:8080
+    environment:
+      - TEMPORAL_CORS_ORIGINS=https://temporal.${ROOT_DOMAIN}
+    networks:
+      - wan
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.temporal.tls=true"
+      - "traefik.http.routers.temporal.entrypoints=websecure"
+      - "traefik.http.routers.temporal.tls.certresolver=dns-cloudflare"
+      - "traefik.http.routers.temporal.rule=Host(`temporal.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.temporal.middlewares=no-auth@docker"
+      - "traefik.http.routers.temporal.service=temporal"
+      - "traefik.http.services.temporal.loadbalancer.server.scheme=http"
+      - "traefik.http.services.temporal.loadbalancer.server.port=4202"
+
+networks:
+  wan:
