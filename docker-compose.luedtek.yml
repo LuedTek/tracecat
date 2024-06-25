@@ -15,7 +15,7 @@ services:
       - "traefik.http.services.tracecat-api.loadbalancer.server.scheme=http"
       - "traefik.http.services.tracecat-api.loadbalancer.server.port=4202"
 
-  frontend:
+  ui:
     ports:
       - 4201:3000
     networks:
