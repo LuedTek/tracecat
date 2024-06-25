@@ -81,8 +81,8 @@ services:
   postgres_db:
     image: postgres:16.2-bullseye
     container_name: tracecat_postgres_db
-    ports:
-      - 5432:5432
+    # ports:
+    #   - 5432:5432
     restart: always
     shm_size: 128mb
     environment:
@@ -120,8 +120,8 @@ services:
       - temporal
     volumes:
       - temporal-elasticsearch:/var/lib/elasticsearch/data
-    expose:
-      - 9200
+    # expose:
+    #   - 9200
 
   temporal_ui:
     image: temporalio/ui:${TEMPORAL__UI_VERSION}
@@ -150,8 +150,8 @@ services:
       - ES_SEEDS=temporal_elasticsearch
       - ES_VERSION=v7
       - LOG_LEVEL=warn
-    ports:
-      - 7233:7233
+    # ports:
+    #   - 7233:7233
     depends_on:
       - temporal_postgres_db
     networks:
