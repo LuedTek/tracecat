@@ -108,6 +108,7 @@ services:
     volumes:
       - temporal-db:/var/lib/postgresql/data
 
+<<<<<<< ours
   temporal_elasticsearch:
     container_name: tracecat_temporal_elasticsearch
     environment:
@@ -127,6 +128,8 @@ services:
     # expose:
     #   - 9200
 
+=======
+>>>>>>> theirs
   temporal_ui:
     image: temporalio/ui:${TEMPORAL__UI_VERSION}
     container_name: tracecat_temporal_ui
@@ -135,7 +138,6 @@ services:
       - TEMPORAL_CORS_ORIGINS=http://localhost:3000
     depends_on:
       - temporal
-      - temporal_elasticsearch
     networks:
       - temporal
     ports:
@@ -150,9 +152,6 @@ services:
       - POSTGRES_USER=${TEMPORAL__POSTGRES_USER}
       - POSTGRES_PWD=${TEMPORAL__POSTGRES_PASSWORD}
       - POSTGRES_SEEDS=temporal_postgres_db
-      - ENABLE_ES=true
-      - ES_SEEDS=temporal_elasticsearch
-      - ES_VERSION=v7
       - LOG_LEVEL=warn
     # ports:
     #   - 7233:7233
@@ -169,4 +168,3 @@ volumes:
   core-app:
   core-db:
   temporal-db:
-  temporal-elasticsearch:
