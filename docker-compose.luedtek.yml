@@ -1,0 +1,93 @@
+services:
+  # worker:
+  #   build: .
+  #   volumes:
+  #     - ./tracecat:/app/tracecat
+  #     - core-app:/var/lib/tracecat
+  #   environment:
+  #     DUMP_TRACECAT_RESULT: 1
+
+  # api:
+    # build: .
+    # volumes:
+    #   - ./tracecat:/app/tracecat
+    #   - core-app:/var/lib/tracecat
+    # environment:
+    #   DUMP_TRACECAT_RESULT: 1
+    # ports:
+    #   - 4202:8000 # redirecting my port ONLY because of my special traefik set up.
+    # networks:
+    #   - wan
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.tracecat-api.tls=true"
+    #   - "traefik.http.routers.tracecat-api.entrypoints=websecure"
+    #   - "traefik.http.routers.tracecat-api.tls.certresolver=dns-cloudflare"
+    #   - "traefik.http.routers.tracecat-api.rule=Host(`tc.${ROOT_DOMAIN}`)"
+    #   # My custom middleware chain from my main traefik instance.
+    #   - "traefik.http.middlewares.tracecat-no-auth.chain.middlewares=rate-limit@docker,tracecat-api-response@redis,security-headers@docker" # you should not be using @redis in a regular traefik set up.
+    #   # The most important line here, applying the missing header from FastAPI to all responses:
+    #   - "traefik.http.middlewares.tracecat-api-response.headers.customresponseheaders.Access-Control-Allow-Origin=https://tracecat.${ROOT_DOMAIN}"
+    #   # Re-adding response headers that FastAPI's CORS should handle already
+    #   - "traefik.http.middlewares.tracecat-api-response.headers.accesscontrolallowmethods=*"
+    #   - "traefik.http.middlewares.tracecat-api-response.headers.accesscontrolallowheaders=*"
+    #   - "traefik.http.middlewares.tracecat-api-response.headers.accesscontrolalloworiginlist=https://tracecat.${ROOT_DOMAIN}"
+    #   - "traefik.http.middlewares.tracecat-api-response.headers.accesscontrolmaxage=100"
+    #   - "traefik.http.middlewares.tracecat-api-response.headers.addvaryheader=true"
+    #   # Apply the middleware chain 
+    #   - "traefik.http.routers.tracecat-api.middlewares=tracecat-no-auth@redis"
+    #   - "traefik.http.routers.tracecat-api.service=tracecat-api"
+    #   - "traefik.http.services.tracecat-api.loadbalancer.server.scheme=http"
+    #   - "traefik.http.services.tracecat-api.loadbalancer.server.port=4202" # This should be 8000 for regular traefik setups
+
+  caddy:
+    # rebuilding to ensure my clerk publishable key is attached during build. This is broken in the image.  
+    # build:
+    #   context: ./frontend
+    #   dockerfile: Dockerfile
+    #   args:
+    #     NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    #     NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+    #     NEXT_PUBLIC_DISABLE_AUTH: ${TRACECAT__DISABLE_AUTH}
+    #     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY} # Sensitive
+    #     NEXT_SERVER_API_URL: ${NEXT_SERVER_API_URL}
+    #     NODE_ENV: ${NODE_ENV}
+    # volumes:
+    #   - ./frontend/src:/app/src
+    #   - ./frontend/.next:/app/.next
+    #   - ./frontend/node_modules:/app/node_modules
+    ports:
+      - 4201:80
+    networks:
+      - wan
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tracecat.tls=true"
+      - "traefik.http.routers.tracecat.entrypoints=websecure"
+      - "traefik.http.routers.tracecat.tls.certresolver=dns-cloudflare"
+      - "traefik.http.routers.tracecat.rule=Host(`tracecat.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.tracecat.middlewares=no-auth@docker"
+      - "traefik.http.routers.tracecat.service=tracecat"
+      - "traefik.http.services.tracecat.loadbalancer.server.scheme=http"
+      - "traefik.http.services.tracecat.loadbalancer.server.port=4201"
+
+  temporal_ui:
+    ports:
+      - 4203:8080
+    environment:
+      - TEMPORAL_CORS_ORIGINS=https://temporal.${ROOT_DOMAIN}
+    networks:
+      - wan
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.temporal.tls=true"
+      - "traefik.http.routers.temporal.entrypoints=websecure"
+      - "traefik.http.routers.temporal.tls.certresolver=dns-cloudflare"
+      - "traefik.http.routers.temporal.rule=Host(`temporal.${ROOT_DOMAIN}`)"
+      - "traefik.http.routers.temporal.middlewares=authelia-main@redis"
+      - "traefik.http.routers.temporal.service=temporal"
+      - "traefik.http.services.temporal.loadbalancer.server.scheme=http"
+      - "traefik.http.services.temporal.loadbalancer.server.port=4203"
+
+networks:
+  wan:
