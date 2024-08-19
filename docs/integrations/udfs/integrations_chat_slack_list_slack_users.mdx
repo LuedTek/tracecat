@@ -20,22 +20,6 @@ This is the [JSONSchema7](https://json-schema.org/draft-07/json-schema-release-n
 {
     "additionalProperties": false,
     "properties": {
-        "emails": {
-            "anyOf": [
-                {
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
-                },
-                {
-                    "type": "null"
-                }
-            ],
-            "default": null,
-            "description": "List of emails to filter users by",
-            "title": "Emails"
-        },
         "team_id": {
             "anyOf": [
                 {
