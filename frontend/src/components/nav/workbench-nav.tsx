@@ -2,7 +2,7 @@
 
 import React, { useCallback } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   ApiError,
   UDFArgsValidationResponse,
@@ -17,14 +17,15 @@ import {
   GitPullRequestCreateArrowIcon,
   MoreHorizontal,
   PlayIcon,
-  ShieldAlertIcon,
   SquarePlay,
+  Trash2Icon,
   WorkflowIcon,
 } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 
 import { exportWorkflowJson } from "@/lib/export"
+import { useWorkflowManager } from "@/lib/hooks"
 import { cn } from "@/lib/utils"
 import {
   AlertDialog,
@@ -46,6 +47,16 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,12 +101,16 @@ export function WorkbenchNav() {
 
   const handleCommit = async () => {
     console.log("Committing changes...")
-    const response = await commitWorkflow()
-    const { status, errors } = response
-    if (status === "failure") {
-      setCommitErrors(errors || null)
-    } else {
-      setCommitErrors(null)
+    try {
+      const response = await commitWorkflow()
+      const { status, errors } = response
+      if (status === "failure") {
+        setCommitErrors(errors || null)
+      } else {
+        setCommitErrors(null)
+      }
+    } catch (error) {
+      console.error("Failed to commit workflow:", error)
     }
   }
 
@@ -106,23 +121,26 @@ export function WorkbenchNav() {
   const manualTriggerDisabled = workflow.version === null
   const workflowsPath = `/workspaces/${workspaceId}/workflows`
   return (
-    <div className="flex w-full items-center space-x-8">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href={workflowsPath}>
-              {workspace.name}
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator className="font-semibold">
-            {"/"}
-          </BreadcrumbSeparator>
-          <BreadcrumbItem>{workflow.title}</BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <TabSwitcher workflowId={workflow.id} />
+    <div className="flex w-full items-center">
+      <div className="mr-4 min-w-0 flex-1">
+        <Breadcrumb>
+          <BreadcrumbList className="flex-nowrap overflow-hidden whitespace-nowrap">
+            <BreadcrumbItem>
+              <BreadcrumbLink href={workflowsPath}>
+                {workspace.name}
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator className="shrink-0 font-semibold">
+              {"/"}
+            </BreadcrumbSeparator>
+            <BreadcrumbItem>{workflow.title}</BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </div>
 
-      <div className="flex flex-1 items-center justify-end space-x-6">
+      <div className="flex items-center justify-end space-x-6">
+        {/* Workflow tabs */}
+        <TabSwitcher workflowId={workflow.id} />
         {/* Workflow manual trigger */}
         <Popover>
           <Tooltip>
@@ -149,14 +167,14 @@ export function WorkbenchNav() {
                 ? "Please commit changes to enable manual trigger."
                 : "Run the workflow manually without a webhook. Click to configure inputs."}
             </TooltipContent>
-            <PopoverContent className="p-3">
+            <PopoverContent className="w-96 p-3">
               <WorkflowExecutionControls workflowId={workflow.id} />
             </PopoverContent>
           </Tooltip>
         </Popover>
 
         {/* Commit button */}
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-2">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -273,9 +291,7 @@ function TabSwitcher({ workflowId }: { workflowId: string }) {
   const pathname = usePathname()
   const { workspaceId } = useWorkspace()
   let leafRoute: string = "workflow"
-  if (pathname.endsWith("cases")) {
-    leafRoute = "cases"
-  } else if (pathname.endsWith("executions")) {
+  if (pathname.endsWith("executions")) {
     leafRoute = "executions"
   }
 
@@ -283,21 +299,11 @@ function TabSwitcher({ workflowId }: { workflowId: string }) {
 
   return (
     <Tabs value={leafRoute}>
-      <TabsList className="grid h-8 w-full grid-cols-3">
+      <TabsList className="grid h-8 w-full grid-cols-2">
         <TabsTrigger className="w-full px-2 py-0" value="workflow" asChild>
           <Link href={workbenchPath} className="size-full text-xs" passHref>
             <WorkflowIcon className="mr-2 size-4" />
             <span>Workflow</span>
-          </Link>
-        </TabsTrigger>
-        <TabsTrigger className="w-full px-2 py-0" value="cases" asChild>
-          <Link
-            href={workbenchPath + "/cases"}
-            className="size-full text-xs"
-            passHref
-          >
-            <ShieldAlertIcon className="mr-2 size-4" />
-            <span>Cases</span>
           </Link>
         </TabsTrigger>
         <TabsTrigger className="w-full px-2 py-0" value="executions" asChild>
@@ -331,7 +337,7 @@ function WorkflowExecutionControls({ workflowId }: { workflowId: string }) {
   const { workspaceId } = useWorkspace()
   const form = useForm<TWorkflowControlsForm>({
     resolver: zodResolver(workflowControlsFormSchema),
-    defaultValues: { payload: '{"example": "value"}' },
+    defaultValues: { payload: '{"sampleWebhookParam": "sampleValue"}' },
   })
 
   const handleSubmit = useCallback(async () => {
@@ -416,36 +422,79 @@ function WorkbenchNavOptions({
   workspaceId: string
   workflowId: string
 }) {
+  const router = useRouter()
+  const { deleteWorkflow } = useWorkflowManager()
+
+  const handleDeleteWorkflow = async () => {
+    console.log("Delete workflow")
+    await deleteWorkflow(workflowId)
+    router.push(`/workspaces/${workspaceId}`)
+  }
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <MoreHorizontal className="size-4" />
-          <span className="sr-only">More</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onClick={async () => {
-            try {
-              await exportWorkflowJson({
-                workspaceId,
-                workflowId,
-                format: "json",
-              })
-            } catch (error) {
-              console.error("Failed to download workflow definition:", error)
-              toast({
-                title: "Error exporting workflow",
-                description: "Could not export workflow. Please try again.",
-              })
-            }
-          }}
-        >
-          <DownloadIcon className="mr-2 size-4 text-foreground/70" />
-          <span className="text-xs text-foreground/70">Export as JSON</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <Dialog>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="size-4" />
+              <span className="sr-only">More</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              className="text-xs text-foreground/70"
+              onClick={async () => {
+                try {
+                  await exportWorkflowJson({
+                    workspaceId,
+                    workflowId,
+                    format: "json",
+                  })
+                } catch (error) {
+                  console.error(
+                    "Failed to download workflow definition:",
+                    error
+                  )
+                  toast({
+                    title: "Error exporting workflow",
+                    description: "Could not export workflow. Please try again.",
+                  })
+                }
+              }}
+            >
+              <DownloadIcon className="mr-2 size-4" />
+              <span>Export as JSON</span>
+            </DropdownMenuItem>
+            <DialogTrigger asChild>
+              <DropdownMenuItem className="text-xs text-red-600">
+                <Trash2Icon className="mr-2 size-4" />
+                <span>Delete</span>
+              </DropdownMenuItem>
+            </DialogTrigger>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete workflow</DialogTitle>
+            <DialogClose />
+          </DialogHeader>
+          <DialogDescription>
+            Are you sure you want to permanently delete this workflow?
+          </DialogDescription>
+          <DialogFooter>
+            <Button variant="outline">Cancel</Button>
+            <Button
+              onClick={handleDeleteWorkflow}
+              variant="destructive"
+              className="mr-2"
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

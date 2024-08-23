@@ -180,31 +180,14 @@ class Case(Resource, table=True):
     tags: dict[str, str] | None = Field(sa_column=Column(JSONB))
 
 
-class CaseAction(Resource, table=True):
-    id: str = Field(
-        default_factory=id_factory("case-act"), nullable=False, unique=True, index=True
-    )
-    tag: str
-    value: str
-    user_id: UUID4 | None = Field(sa_column=Column(UUID, ForeignKey("user.id")))
-
-
-class CaseContext(Resource, table=True):
-    id: str = Field(
-        default_factory=id_factory("case-ctx"), nullable=False, unique=True, index=True
-    )
-    tag: str
-    value: str
-    user_id: UUID4 | None = Field(sa_column=Column(UUID, ForeignKey("user.id")))
-
-
 class CaseEvent(Resource, table=True):
     id: str = Field(
         default_factory=id_factory("case-evt"), nullable=False, unique=True, index=True
     )
     type: str  # The CaseEvent type
-    workflow_id: str
-    case_id: str
+    case_id: str = Field(
+        sa_column=Column(String, ForeignKey("case.id", ondelete="CASCADE"))
+    )
     # Tells us what kind of role modified the case
     initiator_role: str  # "user", "service"
     # Changes: We'll use a dict to store the changes
