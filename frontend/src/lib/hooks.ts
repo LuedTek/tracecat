@@ -6,13 +6,13 @@ import {
   actionsUpdateAction,
   ApiError,
   CaseEvent,
-  CaseEventParams,
-  CaseParams,
-  CaseResponse,
+  CaseEventCreate,
+  CaseRead,
   casesCreateCaseEvent,
   casesGetCase,
   casesListCaseEvents,
   casesUpdateCase,
+  CaseUpdate,
   CreateSecretParams,
   CreateWorkspaceParams,
   EventHistoryResponse,
@@ -39,6 +39,8 @@ import {
   workflowExecutionsListWorkflowExecutionEventHistory,
   workflowExecutionsListWorkflowExecutions,
   WorkflowMetadataResponse,
+  workflowsCreateWorkflow,
+  WorkflowsCreateWorkflowData,
   workflowsDeleteWorkflow,
   workflowsListWorkflows,
   workspacesCreateWorkspace,
@@ -50,10 +52,8 @@ import { useWorkspace } from "@/providers/workspace"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Cookies from "js-cookie"
 
-import { type WorkflowMetadata } from "@/types/schemas"
 import { retryHandler, TracecatApiError } from "@/lib/errors"
 import { isEmptyObject } from "@/lib/utils"
-import { fetchAllPlaybooks } from "@/lib/workflow"
 import { toast } from "@/components/ui/use-toast"
 import { UDFNodeType } from "@/components/workbench/canvas/udf-node"
 
@@ -74,28 +74,26 @@ export function useLocalStorage<T>(
   return [value, setValue]
 }
 
-export function usePanelCase(
-  workspaceId: string,
-  workflowId: string,
-  caseId: string
-) {
+export function usePanelCase(workspaceId: string, caseId: string) {
   const queryClient = useQueryClient()
-  const { data, isLoading, error } = useQuery<CaseResponse, ApiError>({
+  const {
+    data: caseData,
+    isLoading: caseIsLoading,
+    error: caseError,
+  } = useQuery<CaseRead, ApiError>({
     queryKey: ["case", caseId],
     queryFn: async () =>
       await casesGetCase({
         workspaceId,
         caseId,
-        workflowId,
       }),
   })
-  const { mutateAsync } = useMutation({
-    mutationFn: async (newCase: CaseParams) =>
+  const { mutateAsync: updateCaseAsync } = useMutation({
+    mutationFn: async (params: CaseUpdate) =>
       await casesUpdateCase({
         workspaceId,
         caseId,
-        workflowId,
-        requestBody: newCase,
+        requestBody: params,
       }),
     onSuccess: () => {
       toast({
@@ -119,33 +117,35 @@ export function usePanelCase(
   })
 
   return {
-    caseData: data,
-    caseIsLoading: isLoading,
-    caseError: error,
-    updateCaseAsync: mutateAsync,
+    caseData,
+    caseIsLoading,
+    caseError,
+    updateCaseAsync,
   }
 }
 
-export function useCaseEvents(workflowId: string, caseId: string) {
+export function useCaseEvents(caseId: string) {
   const queryClient = useQueryClient()
   const { workspaceId } = useWorkspace()
-  const { data, isLoading, error } = useQuery<CaseEvent[], Error>({
+  const {
+    data: caseEvents,
+    isLoading: caseEventsIsLoading,
+    error: caseEventsError,
+  } = useQuery<CaseEvent[], Error>({
     queryKey: ["caseEvents", caseId],
     queryFn: async () =>
       await casesListCaseEvents({
         workspaceId,
-        workflowId,
         caseId,
       }),
   })
 
-  const { mutateAsync } = useMutation({
-    mutationFn: async (newEvent: CaseEventParams) => {
+  const { mutateAsync: mutateCaseEventsAsync } = useMutation({
+    mutationFn: async (params: CaseEventCreate) => {
       await casesCreateCaseEvent({
         workspaceId,
-        workflowId,
         caseId,
-        requestBody: newEvent,
+        requestBody: params,
       })
     },
     onSuccess: () => {
@@ -171,10 +171,10 @@ export function useCaseEvents(workflowId: string, caseId: string) {
   })
 
   return {
-    caseEvents: data,
-    caseEventsIsLoading: isLoading,
-    caseEventsError: error,
-    mutateCaseEventsAsync: mutateAsync,
+    caseEvents,
+    caseEventsIsLoading,
+    caseEventsError,
+    mutateCaseEventsAsync,
   }
 }
 
@@ -299,6 +299,42 @@ export function useWorkflowManager() {
     retry: retryHandler,
   })
 
+  // Create workflow
+  const { mutateAsync: createWorkflow } = useMutation({
+    mutationFn: async (params: WorkflowsCreateWorkflowData) =>
+      await workflowsCreateWorkflow(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workflows", workspaceId] })
+      toast({
+        title: "Created workflow",
+        description: "Your workflow has been created successfully.",
+      })
+    },
+    onError: (error: TracecatApiError) => {
+      switch (error.status) {
+        case 400:
+          toast({
+            title: "Cannot create workflow",
+            description: "The uploaded workflow YAML / JSON is invalid.",
+          })
+          break
+        case 409:
+          toast({
+            title: "Workflow already exists",
+            description: "A workflow with the same ID already exists.",
+          })
+          break
+        default:
+          console.error("Failed to create workflow:", error)
+          toast({
+            title: "Error creating workflow",
+            description: error.body.detail + ". Please try again.",
+            variant: "destructive",
+          })
+      }
+    },
+  })
+
   // Delete workflow
   const { mutateAsync: deleteWorkflow } = useMutation({
     mutationFn: async (workflowId: string) =>
@@ -335,17 +371,11 @@ export function useWorkflowManager() {
     workflows,
     workflowsLoading,
     workflowsError,
+    createWorkflow,
     deleteWorkflow,
   }
 }
 
-export function usePlaybooks() {
-  const query = useQuery<WorkflowMetadata[], Error>({
-    queryKey: ["playbooks"],
-    queryFn: fetchAllPlaybooks,
-  })
-  return query
-}
 export function useWorkspaceManager() {
   const queryClient = useQueryClient()
   const router = useRouter()
@@ -410,7 +440,7 @@ export function useWorkspaceManager() {
         case 400:
           toast({
             title: "Cannot delete workspace",
-            description: error.body.detail,
+            description: JSON.stringify(error.body.detail),
           })
           break
         default:
